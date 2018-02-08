@@ -1,12 +1,25 @@
 #include <iostream>
-#include <ctime>
-#include <chrono>
 #include <cmath>
 #include <vector>
 #include <random>
 #include <fstream>
+#include <sys/timeb.h>
 
 using namespace std;
+
+int getMilliCount() {
+    timeb tb{};
+    ftime(&tb);
+    int nCount = static_cast<int>(tb.millitm + (tb.time & 0xfffff) * 1000);
+    return nCount;
+}
+
+int getMilliSpan(int nTimeStart) {
+    int nSpan = getMilliCount() - nTimeStart;
+    if (nSpan < 0)
+        nSpan += 0x100000 * 1000;
+    return nSpan;
+}
 
 int getDigit(int number, int place) {
     if ((log10(number) + 1) < place) return 0;
@@ -20,7 +33,6 @@ int getDigit(int number, int place) {
 
 vector<int> radixSort(vector<int> input, int digit) {
     vector<int> sortedList;
-    sortedList.reserve(input.size());
     vector <vector<int>> buckets;
     for (int i = 0; i < 10; ++i) {
         if (sortedList.size() == input.size())break;
@@ -59,38 +71,36 @@ vector<int> getUsortedList(int size, unsigned int minValue, unsigned int maxValu
 }
 
 int sort(unsigned int amount, unsigned int max = 100, unsigned int min = 1) {
-    using namespace chrono;
     auto unsortedList = getUsortedList(amount, min, max);
-    long timeStart = duration_cast<milliseconds>(
-            time_point_cast<milliseconds>(system_clock::now()).time_since_epoch()).count();
+    int timeStart = getMilliCount();
 
     auto sortedList = radixSort(unsortedList, static_cast<unsigned int>(log10(max) + 1));
 
-    using namespace chrono;
-    long timeEnd = duration_cast<milliseconds>(
-            time_point_cast<milliseconds>(system_clock::now()).time_since_epoch()).count();
+
     // debug print sorted list
 //    for (int j = 0; j < amount; ++j) {
 //        cout << sortedList[j] << ", ";
 //    }
 
-    return static_cast<int>(timeEnd - timeStart);
+    return getMilliSpan(timeStart);
 }
 
 int main() {
     unsigned int max = 100;
     unsigned int min = 1;
-    unsigned int amount = 1;
-    int loops = 100;
+    unsigned int amount = 100;
+    int loops = 500;
+    int stepSize = 10;
     int totalTime = 0;
+    ofstream resultFile;
+    resultFile.open("result.csv");
+    resultFile << "Items, Time(ms)\n";
     for (int i = 1; i <= loops; ++i) {
-        int result = sort(amount * (i * 10000));
+        int result = sort(amount * (i * stepSize), max);
         totalTime += result;
-        cout << "Items: " << amount * (i * 10000) << "\t\tElapsed time: " << result << "ms" << endl;
-        ofstream resultFile;
-        resultFile.open("result.csv");
-        resultFile << amount * (i * 10000) << ";" << result << "\n";
-        resultFile.close();
+        cout << "Items: " << amount * (i * stepSize) << "\t\t\tElapsed time: " << result << "ms" << endl;
+        resultFile << amount * (i * stepSize) << "," << result << "\n";
     }
-    cout << "Total elapsed time: " << totalTime << "ms" << endl;
+    resultFile.close();
+    cout << "Total sorting time: " << totalTime << "ms" << endl;
 }
